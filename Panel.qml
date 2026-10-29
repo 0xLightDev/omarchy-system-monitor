@@ -25,6 +25,12 @@ Panel {
   readonly property color muted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.7)
   readonly property color trackColor: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.12)
   readonly property color chartGrid: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.18)
+  // Use the active theme's accent hue as the palette seed, then rotate it so
+  // each chart series remains distinct even when the theme's role colors are
+  // close together. Brightness follows the popup background.
+  readonly property color chartCpuColor: accent
+  readonly property color chartRamColor: chartHueColor(1 / 3)
+  readonly property color chartGpuColor: chartHueColor(2 / 3)
   // Second data hue. Stays inside the accent family so charted values never
   // read as body text, but dark enough to separate from the primary line.
   readonly property color secondary: Qt.darker(accent, 1.5)
@@ -33,6 +39,14 @@ Panel {
   // would clash on half the themes.
   readonly property color warningColor: Qt.tint(accent, Qt.rgba(urgent.r, urgent.g, urgent.b, 0.6))
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+
+  function chartHueColor(offset) {
+    var hue = accent.hsvHue
+    if (!isFinite(hue) || hue < 0) hue = 0.56
+    var saturation = Math.max(0.72, accent.hsvSaturation)
+    var value = Color.popups.background.hsvValue < 0.5 ? 0.92 : 0.42
+    return Qt.hsva((hue + offset) % 1, saturation, value, 1)
+  }
 
   readonly property string barMode: String(setting("barMode", "Adaptive"))
   // Icon mode keeps the bar quiet: the plugin glyph alone, still tinted at
@@ -632,7 +646,7 @@ Panel {
     // the added CapacityRow entries (one per auto-discovered disk), platform
     // sensor rows, thermal and RPM charts, and the fans section aren't
     // clipped.
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(600 + metrics.extraFilesystems.length * 40 + (metrics.hasPlatformSensors ? metrics.platformSensors.length * 40 + (metrics.fanMode === "custom" ? 400 : 300) : 0)))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(640 + metrics.extraFilesystems.length * 40 + (metrics.hasPlatformSensors ? metrics.platformSensors.length * 40 + (metrics.fanMode === "custom" ? 400 : 300) : 0)))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -665,11 +679,12 @@ Panel {
         Column {
           id: panelColumn
           width: scrollArea.availableWidth
-          spacing: Style.space(9)
+          spacing: Style.space(root.hasGpu ? 4 : 6)
 
           // ---------- Hero: host · uptime and load ----------
           PanelHero {
             width: parent.width
+            height: implicitHeight + Style.space(4)
             title: metrics.hostname !== "" ? metrics.hostname : "System Monitor"
             meta: "Up " + root.formatUptime(metrics.uptimeSeconds) + " · Load " + root.loadText()
             foreground: root.foreground
@@ -744,6 +759,7 @@ Panel {
 
             StatTile {
               visible: root.hasGpuUsage
+              compact: true
               width: root.gpuTileWidth(parent.width, parent.spacing)
               title: "GPU"
               value: root.percent(metrics.gpuPercent)
@@ -755,6 +771,7 @@ Panel {
 
             StatTile {
               visible: root.hasGpuTemperature
+              compact: true
               width: root.gpuTileWidth(parent.width, parent.spacing)
               title: "GPU TEMP"
               value: root.gpuTemperatureText()
@@ -766,6 +783,7 @@ Panel {
 
             StatTile {
               visible: root.hasGpuVram
+              compact: true
               width: root.gpuTileWidth(parent.width, parent.spacing)
               title: "VRAM"
               value: root.percent(root.gpuVramPercent())
@@ -1041,20 +1059,50 @@ Panel {
             width: parent.width
             spacing: Style.space(6)
 
-            SectionHeading {
-              title: root.hasGpuUsage ? "CPU, MEMORY & GPU" : "CPU & MEMORY"
-              value: "2 MIN"
+            Row {
+              id: chartLegend
+              width: parent.width
+              spacing: Style.space(6)
+
+              Text {
+                id: chartScaleLabel
+                text: "100%"
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Row {
+                id: seriesLegend
+                spacing: Style.space(8)
+                LegendDot { colorValue: root.chartCpuColor; label: "CPU" }
+                LegendDot { colorValue: root.chartRamColor; label: "RAM"; dashed: true }
+                LegendDot { visible: root.hasGpuUsage; colorValue: root.chartGpuColor; label: "GPU"; dashed: true; dashLength: 5 }
+              }
+
+              Item { width: Math.max(0, parent.width - chartScaleLabel.width - seriesLegend.width - Style.space(52)); height: 1 }
+
+              Text {
+                text: "2 MIN"
+                color: root.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                anchors.verticalCenter: parent.verticalCenter
+              }
             }
 
             Item {
+              id: historyPlot
               width: parent.width
-              height: Style.space(70)
+              height: Style.space(42)
 
               Sparkline {
                 anchors.fill: parent
                 points: metrics.cpuHistory
-                lineColor: root.accent
-                fillColor: Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.16)
+                lineColor: root.chartCpuColor
+                fillColor: Qt.rgba(root.chartCpuColor.r, root.chartCpuColor.g, root.chartCpuColor.b, 0.16)
                 gridColor: root.chartGrid
                 gridLevels: [0.25, 0.5, 0.75]
                 fixedMaximum: 100
@@ -1063,10 +1111,10 @@ Panel {
               Sparkline {
                 anchors.fill: parent
                 points: metrics.memoryHistory
-                lineColor: root.secondary
+                lineColor: root.chartRamColor
                 fillColor: "transparent"
                 dashed: true
-                lineWidth: 1.2
+                lineWidth: 1.5
                 fixedMaximum: 100
               }
 
@@ -1074,31 +1122,13 @@ Panel {
                 anchors.fill: parent
                 visible: root.hasGpuUsage
                 points: metrics.gpuHistory
-                lineColor: root.warningColor
+                lineColor: root.chartGpuColor
                 fillColor: "transparent"
-                lineWidth: 1.2
+                dashPattern: [6, 2]
+                lineWidth: 1.6
                 fixedMaximum: 100
               }
 
-              // The scale is pinned at 100%, so say so — otherwise an idle
-              // machine just looks like an empty box.
-              Text {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                text: "100%"
-                color: root.muted
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-
-              Row {
-                anchors.top: parent.top
-                anchors.right: parent.right
-                spacing: Style.space(8)
-                LegendDot { colorValue: root.accent; label: "CPU" }
-                LegendDot { colorValue: root.secondary; label: "RAM" }
-                LegendDot { visible: root.hasGpuUsage; colorValue: root.warningColor; label: "GPU" }
-              }
             }
           }
 
@@ -1118,7 +1148,7 @@ Panel {
             Row {
               id: coreStrip
               width: parent.width
-              height: Style.space(18)
+              height: Style.space(14)
               spacing: Style.space(3)
 
               readonly property real cellWidth: metrics.perCore.length > 0
@@ -1170,7 +1200,7 @@ Panel {
           // ---------- Throughput ----------
           Column {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(5)
 
             ActivityColumn {
               width: parent.width
@@ -1227,7 +1257,7 @@ Panel {
           // ---------- Capacity ----------
           Column {
             width: parent.width
-            spacing: Style.space(6)
+            spacing: Style.space(4)
 
             SectionHeading { title: "CAPACITY" }
 
@@ -1351,11 +1381,12 @@ Panel {
     property string title: ""
     property string value: "—"
     property string detail: ""
+    property bool compact: false
     property real meter: -1
     property color meterColor: root.accent
     property bool alarming: false
 
-    height: Style.space(80)
+    height: Style.space(compact ? 72 : 80)
     radius: Style.cornerRadius
     color: Style.normalFillFor(root.foreground, root.accent)
     borderSpec: Border.controlSpec("normal", root.foreground, root.accent)
@@ -1364,8 +1395,8 @@ Panel {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      anchors.margins: Style.space(9)
-      spacing: Style.space(2)
+      anchors.margins: Style.space(tile.compact ? 5 : 9)
+      spacing: Style.space(tile.compact ? 1 : 2)
 
       Text {
         text: tile.title
@@ -1398,23 +1429,39 @@ Panel {
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      anchors.margins: Style.space(9)
+      anchors.margins: Style.space(tile.compact ? 5 : 9)
       value: tile.meter
       fillColor: tile.meterColor
     }
   }
 
   component LegendDot: Row {
+    id: legend
     property color colorValue: "white"
     property string label: ""
+    property bool dashed: false
+    property real dashLength: 3
     spacing: Style.space(4)
 
-    Rectangle {
-      width: Style.space(6)
-      height: width
-      radius: width / 2
-      color: parent.colorValue
+    Item {
+      width: Style.space(20)
+      height: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
+
+      Row {
+        anchors.centerIn: parent
+        spacing: Style.space(2)
+
+        Repeater {
+          model: legend.dashed ? 3 : 1
+          Rectangle {
+            width: legend.dashed ? Style.space(legend.dashLength) : Style.space(20)
+            height: Style.space(2)
+            color: legend.colorValue
+            anchors.verticalCenter: parent.verticalCenter
+          }
+        }
+      }
     }
 
     Text {
@@ -1469,7 +1516,7 @@ Panel {
 
     Sparkline {
       width: parent.width
-      height: Style.space(34)
+      height: Style.space(26)
       points: activity.upPoints
       mirrorPoints: activity.downPoints
       lineColor: root.accent

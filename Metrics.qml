@@ -32,6 +32,7 @@ Item {
   property real gpuTemperature: -1
   property double gpuVramUsed: -1
   property double gpuVramTotal: -1
+  property string gpuName: ""
   property real networkDownBps: -1
   property real networkUpBps: -1
   property real diskReadBps: -1
@@ -295,6 +296,13 @@ Item {
     }
   }
 
+  // NVIDIA's proprietary driver does not expose the same DRM sysfs counters
+  // used by the generic GPU discovery path. Query its supported read-only
+  // interface separately and at a modest cadence.
+  function pollNvidiaGpu() {
+    if (!nvidiaGpuProc.running) nvidiaGpuProc.running = true
+  }
+
   function handleCpu(raw) {
     var parsed = Model.parseCpu(raw, cpuSnapshot)
     cpuSnapshot = parsed.snapshot
@@ -392,6 +400,14 @@ Item {
     repeat: true
     running: true
     onTriggered: root.sample()
+  }
+
+  Timer {
+    interval: 5000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: root.pollNvidiaGpu()
   }
 
   // One FileView per discovered platform sensor, created on demand. Item
@@ -564,6 +580,31 @@ Item {
     printErrors: false
     onLoaded: root.gpuVramTotal = Model.parseByteCount(text())
     onLoadFailed: root.gpuVramTotal = -1
+  }
+
+  Process {
+    id: nvidiaGpuProc
+    command: ["nvidia-smi", "--query-gpu=name,utilization.gpu,temperature.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        // StdioCollector exposes `text` as a property (unlike FileView.text()).
+        var fields = String(this.text).trim().split(",")
+        if (fields.length < 5 || fields[0].trim() === "") return
+        var usage = Number(fields[1].trim())
+        var temperature = Number(fields[2].trim())
+        var usedMiB = Number(fields[3].trim())
+        var totalMiB = Number(fields[4].trim())
+        root.gpuName = fields[0].trim()
+        root.gpuPercent = isFinite(usage) ? usage : -1
+        root.gpuTemperature = isFinite(temperature) ? temperature : -1
+        root.gpuVramUsed = isFinite(usedMiB) ? usedMiB * 1048576 : -1
+        root.gpuVramTotal = isFinite(totalMiB) ? totalMiB * 1048576 : -1
+        if (root.gpuPercent >= 0) {
+          root.gpuHistory = root.appendHistory(root.gpuHistory, Date.now(), root.gpuPercent)
+        }
+      }
+    }
   }
 
   FileView {

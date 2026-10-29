@@ -26,6 +26,7 @@ Canvas {
   property color gridColor: Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.10)
   property var gridLevels: []
   property bool dashed: false
+  property var dashPattern: null
   property real lineWidth: 1.5
   property real fixedMaximum: -1
   property int windowMs: 120000
@@ -36,6 +37,7 @@ Canvas {
   onPointsChanged: requestPaint()
   onMirrorPointsChanged: requestPaint()
   onLineColorChanged: requestPaint()
+  onDashPatternChanged: requestPaint()
   onMirrorLineColorChanged: requestPaint()
   onFixedMaximumChanged: requestPaint()
   onWidthChanged: requestPaint()
@@ -99,7 +101,8 @@ Canvas {
     ctx.fillStyle = fill
     ctx.fill()
 
-    if (ctx.setLineDash) ctx.setLineDash(dash ? [3, 3] : [])
+    var pattern = Array.isArray(dash) ? dash : (dash ? [3, 3] : [])
+    if (ctx.setLineDash) ctx.setLineDash(pattern)
     ctx.beginPath()
     ctx.moveTo(pointX(list[0]), pointY(list[0]))
     for (var lineIndex = 1; lineIndex < list.length; lineIndex++)
@@ -132,6 +135,6 @@ Canvas {
     drawGrid(ctx, axis, span)
     if (mirrored)
       drawSeries(ctx, mirrorPoints, oldest, maximum, axis, span, 1, mirrorLineColor, mirrorFillColor, false)
-    drawSeries(ctx, points, oldest, maximum, axis, span, -1, lineColor, fillColor, dashed)
+    drawSeries(ctx, points, oldest, maximum, axis, span, -1, lineColor, fillColor, dashPattern !== null ? dashPattern : dashed)
   }
 }

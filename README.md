@@ -73,7 +73,7 @@ pressure. Warning and critical colors follow the active Omarchy theme.
 | Disk throughput | `/proc/diskstats` and `/sys/class/block` |
 | CPU temperature | `/sys/class/hwmon` (`coretemp`, `k10temp`, or `zenpower`) |
 | Platform sensors (Apple Silicon/Asahi) | `/sys/class/hwmon` (`macsmc_hwmon` labelled temps and power rails) |
-| GPU load, temperature, and VRAM | `/sys/class/drm/card*/device` (`gpu_busy_percent`, `hwmon`, `mem_info_vram_*`) |
+| GPU load, temperature, and VRAM | DRM sysfs where available; NVIDIA proprietary driver via read-only `nvidia-smi` polling every five seconds |
 | Filesystem capacity | `df -P -k -l -T` |
 
 Temperature is shown when a supported package sensor is available. Apple
@@ -101,16 +101,19 @@ subsets:
 | `i915` (Intel, pre-Arc) | no | yes, kernel 6.12+ (`temp1_input`) | no |
 | `xe` (Intel, Arc/Meteor Lake/Lunar Lake+) | no | yes, kernel 6.15+ (`temp2_input` — `xe` has no `temp1`) | no |
 | `nouveau` | no | yes (`temp1_input`) | no |
-| NVIDIA proprietary | no | no | no |
+| NVIDIA proprietary | yes (`nvidia-smi`) | yes (`nvidia-smi`) | yes (`nvidia-smi`) |
 
 Only `amdgpu` publishes a device-wide utilization counter in sysfs. Intel
 exposes utilization through the PMU or per-client `fdinfo`, both of which need
 either elevated capabilities or per-process accounting. The NVIDIA proprietary
-driver doesn't register a `hwmon` device at all — not even for temperature —
-so every reading, utilization included, requires NVML (`nvidia-smi`). Reading
-any of these would mean spawning a helper process on every sample, which this
-plugin deliberately avoids, so a card that cannot be read is left out rather
-than reported as idle, and NVIDIA is unsupported outright.
+driver doesn't register a `hwmon` device, so the local plugin reads its usage,
+temperature, and VRAM through `nvidia-smi` every five seconds. That query is
+read-only and runs as the user without `sudo`. A card with no available sensor
+data is left out rather than reported as idle.
+
+In the two-minute chart, CPU uses the active theme accent, with RAM and GPU
+colors rotated from that accent to keep the traces distinct across themes.
+CPU is solid, RAM has a short dash, and GPU a longer dash.
 
 A card with a temperature sensor but no utilization counter still gets a
 section, showing just the tiles it can fill. When nothing is readable, the
