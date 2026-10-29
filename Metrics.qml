@@ -515,10 +515,13 @@ Item {
     watchChanges: false
     printErrors: false
     onLoaded: {
-      var value = Number(String(text()).trim()) / 1000
+      var raw = String(text()).trim()
+      var value = Number(raw) / 1000
       root.cpuTemperature = isFinite(value) && value > 0 ? value : -1
     }
-    onLoadFailed: root.cpuTemperature = -1
+    onLoadFailed: {
+      root.cpuTemperature = -1
+    }
   }
 
   FileView {
