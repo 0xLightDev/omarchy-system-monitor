@@ -417,16 +417,16 @@ Panel {
         : Math.max(metrics.cpuPercent, metrics.memoryPercent)
       return isFinite(value) && value >= 0 ? String(Math.round(value)) : "—"
     }
-    if (barMode === "CPU") return "󰻠 " + padPercent(metrics.cpuPercent)
-    if (barMode === "Memory") return "󰍛 " + padPercent(metrics.memoryPercent)
+    if (barMode === "CPU") return "󰻠" + padPercent(metrics.cpuPercent)
+    if (barMode === "Memory") return "󰍛" + padPercent(metrics.memoryPercent)
     if (barMode === "GPU") return "GPU " + padPercent(metrics.gpuPercent)
     if (barMode === "Temp") return thermalBarName() + " " + padThermalBarValue()
     if (barMode === "Both")
-      return "󰻠 " + padPercent(metrics.cpuPercent) + " 󰍛 " + padPercent(metrics.memoryPercent)
+      return "󰻠" + padPercent(metrics.cpuPercent) + " 󰍛 " + padPercent(metrics.memoryPercent)
     // Adaptive: CPU vs RAM pressure only — never heat/temp (explicit Temp mode).
     return metrics.cpuPercent >= metrics.memoryPercent
-      ? "󰻠 " + padPercent(metrics.cpuPercent)
-      : "󰍛 " + padPercent(metrics.memoryPercent)
+      ? "󰻠" + padPercent(metrics.cpuPercent)
+      : "󰍛" + padPercent(metrics.memoryPercent)
   }
 
   function tooltipText() {
@@ -543,7 +543,7 @@ Panel {
     text: root.barLabel()
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     foreground: root.bar ? root.bar.barForeground : root.foreground
-    fontSize: Style.font.body
+    fontSize: Style.font.caption
     horizontalMargin: 6
     active: root.warning || root.critical
     activeColor: root.critical ? root.urgent : root.warningColor
