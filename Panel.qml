@@ -575,13 +575,19 @@ Panel {
           required property var modelData
           spacing: 0
 
-          Text {
-            text: modelData.glyph
-            color: button.active && button.useActiveColor ? button.activeColor : button.foreground
-            font.family: button.fontFamily
-            font.pixelSize: Style.font.icon
-            renderType: Text.NativeRendering
-            anchors.verticalCenter: parent.verticalCenter
+          Item {
+            width: Style.font.icon * 0.62
+            height: Style.font.icon
+
+            Text {
+              text: modelData.glyph
+              color: button.active && button.useActiveColor ? button.activeColor : button.foreground
+              font.family: button.fontFamily
+              font.pixelSize: Style.font.icon
+              renderType: Text.NativeRendering
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+            }
           }
 
           Text {
