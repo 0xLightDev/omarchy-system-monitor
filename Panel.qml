@@ -75,6 +75,10 @@ Panel {
     return text
   }
 
+  function compactPercent(value) {
+    return isFinite(value) && value >= 0 ? Math.round(value) + "%" : "—"
+  }
+
   // Fixed-width thermal bar value: watts on Asahi (heatpipe), °C elsewhere.
   function padThermalBarValue() {
     if (thermalTileIsWatts()) {
@@ -405,8 +409,8 @@ Panel {
   // width as values cross 10 and 100 instead of shoving its neighbours.
   readonly property bool showBarIndicators: !button.vertical && ["CPU", "Memory", "Both", "Adaptive", "Temp"].indexOf(barMode) >= 0
   readonly property var barIndicators: {
-    var cpu = { glyph: "󰻠", value: padPercent(metrics.cpuPercent) }
-    var memory = { glyph: "󰍛", value: padPercent(metrics.memoryPercent) }
+    var cpu = { glyph: "󰻠", value: compactPercent(metrics.cpuPercent) }
+    var memory = { glyph: "󰍛", value: compactPercent(metrics.memoryPercent) }
     if (barMode === "CPU") return [cpu]
     if (barMode === "Memory") return [memory]
     if (barMode === "Both") return [cpu, memory]
