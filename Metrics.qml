@@ -8,7 +8,7 @@ Item {
 
   property var settings: ({})
   property bool panelOpen: false
-  readonly property string pluginPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/harshith.system-monitor"
+  readonly property string pluginPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/light.system-monitor"
   readonly property int closedRefreshMs: Math.max(2000, Number(settings.closedRefreshSec || 5) * 1000)
   readonly property int openRefreshMs: Math.max(1000, Number(settings.openRefreshSec || 2) * 1000)
   readonly property string configuredInterface: String(settings.networkInterface || "").trim()
