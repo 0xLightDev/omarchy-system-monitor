@@ -403,13 +403,14 @@ Panel {
 
   // Every horizontal form is a fixed character count, so the widget keeps its
   // width as values cross 10 and 100 instead of shoving its neighbours.
-  readonly property bool showBarIndicators: !button.vertical && ["CPU", "Memory", "Both", "Adaptive"].indexOf(barMode) >= 0
+  readonly property bool showBarIndicators: !button.vertical && ["CPU", "Memory", "Both", "Adaptive", "Temp"].indexOf(barMode) >= 0
   readonly property var barIndicators: {
     var cpu = { glyph: "󰻠", value: padPercent(metrics.cpuPercent) }
     var memory = { glyph: "󰍛", value: padPercent(metrics.memoryPercent) }
     if (barMode === "CPU") return [cpu]
     if (barMode === "Memory") return [memory]
     if (barMode === "Both") return [cpu, memory]
+    if (barMode === "Temp") return [{ glyph: "󰔄", value: padThermalBarValue() }]
     return metrics.cpuPercent >= metrics.memoryPercent ? [cpu] : [memory]
   }
 
@@ -430,7 +431,7 @@ Panel {
     if (barMode === "CPU") return padPercent(metrics.cpuPercent)
     if (barMode === "Memory") return padPercent(metrics.memoryPercent)
     if (barMode === "GPU") return "GPU " + padPercent(metrics.gpuPercent)
-    if (barMode === "Temp") return thermalBarName() + " " + padThermalBarValue()
+    if (barMode === "Temp") return padThermalBarValue()
     if (barMode === "Both")
       return padPercent(metrics.cpuPercent) + "  " + padPercent(metrics.memoryPercent)
     // Adaptive: CPU vs RAM pressure only — never heat/temp (explicit Temp mode).
@@ -566,13 +567,13 @@ Panel {
       id: indicatorRow
       anchors.centerIn: parent
       visible: root.showBarIndicators
-      spacing: Style.space(4)
+      spacing: Style.space(7)
 
       Repeater {
         model: root.barIndicators
         delegate: Row {
           required property var modelData
-          spacing: Style.space(1)
+          spacing: 0
 
           Text {
             text: modelData.glyph
