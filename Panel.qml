@@ -403,6 +403,16 @@ Panel {
 
   // Every horizontal form is a fixed character count, so the widget keeps its
   // width as values cross 10 and 100 instead of shoving its neighbours.
+  readonly property bool showBarIndicators: !button.vertical && ["CPU", "Memory", "Both", "Adaptive"].indexOf(barMode) >= 0
+  readonly property var barIndicators: {
+    var cpu = { glyph: "󰻠", value: padPercent(metrics.cpuPercent) }
+    var memory = { glyph: "󰍛", value: padPercent(metrics.memoryPercent) }
+    if (barMode === "CPU") return [cpu]
+    if (barMode === "Memory") return [memory]
+    if (barMode === "Both") return [cpu, memory]
+    return metrics.cpuPercent >= metrics.memoryPercent ? [cpu] : [memory]
+  }
+
   function barLabel() {
     // A vertical bar has room for the number and nothing else.
     if (button.vertical) {
@@ -417,16 +427,16 @@ Panel {
         : Math.max(metrics.cpuPercent, metrics.memoryPercent)
       return isFinite(value) && value >= 0 ? String(Math.round(value)) : "—"
     }
-    if (barMode === "CPU") return "󰻠" + padPercent(metrics.cpuPercent)
-    if (barMode === "Memory") return "󰍛" + padPercent(metrics.memoryPercent)
+    if (barMode === "CPU") return padPercent(metrics.cpuPercent)
+    if (barMode === "Memory") return padPercent(metrics.memoryPercent)
     if (barMode === "GPU") return "GPU " + padPercent(metrics.gpuPercent)
     if (barMode === "Temp") return thermalBarName() + " " + padThermalBarValue()
     if (barMode === "Both")
-      return "󰻠" + padPercent(metrics.cpuPercent) + " 󰍛 " + padPercent(metrics.memoryPercent)
+      return padPercent(metrics.cpuPercent) + "  " + padPercent(metrics.memoryPercent)
     // Adaptive: CPU vs RAM pressure only — never heat/temp (explicit Temp mode).
     return metrics.cpuPercent >= metrics.memoryPercent
-      ? "󰻠" + padPercent(metrics.cpuPercent)
-      : "󰍛" + padPercent(metrics.memoryPercent)
+      ? padPercent(metrics.cpuPercent)
+      : padPercent(metrics.memoryPercent)
   }
 
   function tooltipText() {
@@ -541,6 +551,8 @@ Panel {
     visible: !root.iconOnly
     bar: root.bar
     text: root.barLabel()
+    labelVisible: !root.showBarIndicators
+    fixedWidth: root.showBarIndicators ? indicatorRow.implicitWidth + scaledHorizontalMargin * 2 : -1
     fontFamily: root.bar ? root.bar.fontFamily : Style.font.family
     foreground: root.bar ? root.bar.barForeground : root.foreground
     fontSize: Style.font.caption
@@ -549,6 +561,39 @@ Panel {
     activeColor: root.critical ? root.urgent : root.warningColor
     tooltipText: root.tooltipText()
     onPressed: function(buttonCode) { root.barPressed(buttonCode) }
+
+    Row {
+      id: indicatorRow
+      anchors.centerIn: parent
+      visible: root.showBarIndicators
+      spacing: Style.space(4)
+
+      Repeater {
+        model: root.barIndicators
+        delegate: Row {
+          required property var modelData
+          spacing: Style.space(1)
+
+          Text {
+            text: modelData.glyph
+            color: button.active && button.useActiveColor ? button.activeColor : button.foreground
+            font.family: button.fontFamily
+            font.pixelSize: Style.font.icon
+            renderType: Text.NativeRendering
+            anchors.verticalCenter: parent.verticalCenter
+          }
+
+          Text {
+            text: modelData.value
+            color: button.active && button.useActiveColor ? button.activeColor : button.foreground
+            font.family: button.fontFamily
+            font.pixelSize: button.fontSize
+            renderType: Text.NativeRendering
+            anchors.verticalCenter: parent.verticalCenter
+          }
+        }
+      }
+    }
   }
 
   BarIconButton {
