@@ -580,7 +580,7 @@ Panel {
           spacing: 0
 
           Item {
-            width: Style.font.icon * 0.62
+            width: Style.font.icon * 0.9
             height: Style.font.icon
 
             Text {
