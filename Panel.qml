@@ -422,7 +422,7 @@ Panel {
     if (barMode === "GPU") return "GPU " + padPercent(metrics.gpuPercent)
     if (barMode === "Temp") return thermalBarName() + " " + padThermalBarValue()
     if (barMode === "Both")
-      return "C " + padPercent(metrics.cpuPercent) + " M " + padPercent(metrics.memoryPercent)
+      return "󰻠 " + padPercent(metrics.cpuPercent) + " 󰍛 " + padPercent(metrics.memoryPercent)
     // Adaptive: CPU vs RAM pressure only — never heat/temp (explicit Temp mode).
     return metrics.cpuPercent >= metrics.memoryPercent
       ? "CPU " + padPercent(metrics.cpuPercent)
