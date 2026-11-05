@@ -6,17 +6,20 @@ import unittest
 
 
 class FanControlTest(unittest.TestCase):
-    def run_helper(self, mode, enabled='N', busy=False):
+    def run_helper(self, mode, enabled='N', busy=False, fan_present=True,
+                   fail_configured_load=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             parameter = root / 'parameter'
             parameter.write_text(enabled)
             fan = root / 'fan'
-            fan.touch()
+            if fan_present:
+                fan.touch()
             log = root / 'calls'
             modprobe = root / 'modprobe'
             modprobe.write_text('#!/bin/bash\necho "$*" >> "$TEST_ROOT/calls"\n'
                                 'if [[ "$1" == -r ]]; then exit "$BUSY"; fi\n'
+                                'if [[ "$1" == thinkpad_acpi && "${2:-}" == fan_control=1 && "$FAIL_CONFIGURED_LOAD" == 1 ]]; then exit 1; fi\n'
                                 'echo Y > "$TEST_ROOT/parameter"\n')
             modprobe.chmod(0o755)
             script = Path(__file__).with_name('fan-control').read_text()
@@ -26,9 +29,10 @@ class FanControlTest(unittest.TestCase):
             script = script.replace('/proc/acpi/ibm/fan', str(fan))
             result = subprocess.run(['bash', '-c', script, 'fan-control', mode],
                                     env={**os.environ, 'PATH': f'{directory}:/usr/bin',
-                                         'TEST_ROOT': directory, 'BUSY': str(int(busy))},
+                                         'TEST_ROOT': directory, 'BUSY': str(int(busy)),
+                                         'FAIL_CONFIGURED_LOAD': str(int(fail_configured_load))},
                                     capture_output=True, text=True)
-            return result, fan.read_text(), log.read_text() if log.exists() else ''
+            return result, fan.read_text() if fan.exists() else None, log.read_text() if log.exists() else ''
 
     def test_activation_and_modes(self):
         for mode, expected in [('enable', ''), ('max', 'level 7\n'),
@@ -52,6 +56,18 @@ class FanControlTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('driver is busy', result.stderr)
         self.assertEqual((fan, calls), ('', '-r thinkpad_acpi\n'))
+
+    def test_missing_fan_interface_is_reported(self):
+        result, fan, calls = self.run_helper('max', enabled='Y', fan_present=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('fan control is unavailable', result.stderr)
+        self.assertEqual((fan, calls), (None, ''))
+
+    def test_failed_configured_module_load_does_not_write_fan(self):
+        result, fan, calls = self.run_helper('max', fail_configured_load=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Could not load the ThinkPad fan driver', result.stderr)
+        self.assertEqual((fan, calls), ('', '-r thinkpad_acpi\nthinkpad_acpi fan_control=1\nthinkpad_acpi\n'))
 
 
 if __name__ == '__main__':
