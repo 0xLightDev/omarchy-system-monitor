@@ -143,16 +143,17 @@ If the helper is unavailable, the controls stay disabled and explain why on
 hover. If manual control is disabled in the kernel, the panel offers an Enable
 manual control action. Enabling it may unload and reload `thinkpad_acpi`, which
 can briefly interrupt ThinkPad hotkey or ACPI features while the driver reloads.
-The helper independently checks DMI identity and refuses to run unless the
-machine identifies as a ThinkPad T530. The regular plugin installer never
-changes system files.
+The maintained helper under `support/thinkpad/` independently checks DMI
+identity and refuses to run unless the machine identifies as a ThinkPad T530.
+The regular plugin installer never changes system files.
 
 The maintained helper, PolicyKit action, and `thinkpad_acpi` module option are
 under `support/thinkpad/`. The original laptop files were compared with the
 installed copies on 2026-11-05. The maintained helper now uses the absolute
 `/usr/bin/modprobe` path; the installed legacy helper remains unchanged until
-Light accepts T530 behavior and separately approves its update. These files
-must never be installed on other hardware.
+Light accepts T530 behavior and separately approves its update. The installed
+helper must be updated before relying on the maintained helper's DMI check.
+These files must never be installed on other hardware.
 
 ## Fan control (Apple Silicon, optional)
 
