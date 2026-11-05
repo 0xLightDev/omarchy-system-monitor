@@ -125,6 +125,32 @@ device identifiers. Two temperature-only cards in one machine — an Intel iGPU
 next to an Arc card, for instance — cannot currently be told apart, and the
 first is used.
 
+## ThinkPad T530 fan controls (optional)
+
+The separate THINKPAD FANS section appears only when DMI `product_version`
+identifies a ThinkPad T530 and `/proc/acpi/ibm/fan` is available. RPM, status,
+and mode are read without privilege. Controls call the root-owned
+`/usr/lib/omarchy-system-specs/fan-control` helper through `pkexec`, with only
+the fixed `enable`, `max`, `auto`, and `full-speed` operations.
+
+Auto returns fan control to firmware. Level 7 selects the normal factory
+maximum. Fan Overdrive selects the existing full-speed override; it overrides
+the embedded controller's fan-speed limit and may exceed hardware limits. It
+does not change CPU/GPU clocks or firmware. The button's tooltip states this
+warning and the control is immediate, without a confirmation dialog.
+
+If the helper is unavailable, the controls stay disabled and explain why on
+hover. If manual control is disabled in the kernel, the panel offers an Enable
+manual control action. The regular plugin installer never changes system
+files.
+
+The maintained copies of the existing helper, PolicyKit action, and
+`thinkpad_acpi` module option are under `support/thinkpad/`. On
+`omarchy-laptop`, those files were compared with the installed copies on
+2026-11-05 and matched. A fresh T530 setup or a future helper change needs a
+separate review and deliberate privileged installation; other machines should
+not receive these files.
+
 ## Fan control (Apple Silicon, optional)
 
 On Asahi machines the panel grows a FANS section when the `asahi-fanctl`

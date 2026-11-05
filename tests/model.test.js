@@ -375,3 +375,11 @@ test("ThinkPad adapter uses read-only telemetry and the fixed command builder", 
   assert.match(qml, /Model\.thinkPadFanCommand\(operation\)/)
   assert.doesNotMatch(qml, /fanFile\.write|thinkPadFanFile\.write|Process[\s\S]{0,200}sh.*-c/)
 })
+
+test("ThinkPad panel gates T530 controls and explains Fan Overdrive risk", () => {
+  const qml = fs.readFileSync(path.join(root, "Panel.qml"), "utf8")
+  assert.match(qml, /metrics\.thinkPadCapability\.telemetryAvailable/)
+  assert.match(qml, /Fan Overdrive/)
+  assert.match(qml, /may exceed hardware limits/)
+  assert.match(qml, /does not change CPU\/GPU clocks or firmware/)
+})

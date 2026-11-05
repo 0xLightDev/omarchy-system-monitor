@@ -339,6 +339,27 @@ Panel {
     return "manual · " + metrics.fanMode
   }
 
+  function thinkPadFanSummaryText() {
+    var fan = metrics.thinkPadFan
+    var parts = []
+    if (fan.status !== "unknown") parts.push("status " + fan.status)
+    if (fan.speed >= 0) parts.push(Math.round(fan.speed) + " RPM")
+    if (fan.level === "auto") parts.push("Auto")
+    else if (fan.level === "full-speed") parts.push("Fan Overdrive")
+    else if (fan.level !== "unknown") parts.push("Level " + fan.level)
+    return parts.length > 0 ? parts.join(" · ") : "Telemetry unavailable"
+  }
+
+  function thinkPadFanTooltip(operation) {
+    var capability = metrics.thinkPadCapability
+    var warning = "Overrides the embedded controller's fan-speed limit and may exceed hardware limits. It does not change CPU/GPU clocks or firmware."
+    if (!capability.controlAvailable || (operation !== "enable" && !capability.manualControlEnabled)) {
+      var reason = capability.reason !== "" ? capability.reason : "Fan control is unavailable"
+      return operation === "full-speed" ? reason + ". " + warning : reason
+    }
+    return operation === "full-speed" ? warning : "Set fan mode to " + operation
+  }
+
   function applyFanCurve() {
     metrics.runFanctl([
       "curve",
@@ -646,7 +667,7 @@ Panel {
     // the added CapacityRow entries (one per auto-discovered disk), platform
     // sensor rows, thermal and RPM charts, and the fans section aren't
     // clipped.
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(640 + metrics.extraFilesystems.length * 40 + (metrics.hasPlatformSensors ? metrics.platformSensors.length * 40 + (metrics.fanMode === "custom" ? 400 : 300) : 0)))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(640 + metrics.extraFilesystems.length * 40 + (metrics.hasPlatformSensors ? metrics.platformSensors.length * 40 + (metrics.fanMode === "custom" ? 400 : 300) : 0) + (metrics.thinkPadCapability.telemetryAvailable ? 130 : 0)))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -1049,6 +1070,88 @@ Panel {
                   onClicked: root.applyFanCurve()
                 }
               }
+            }
+          }
+
+          // ---------- ThinkPad T530 fans ----------
+          // This adapter is separate from Asahi and only appears when both
+          // the T530 DMI identity and ThinkPad proc fan interface are present.
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: metrics.thinkPadCapability.telemetryAvailable
+
+            SectionHeading {
+              title: "THINKPAD FANS"
+              value: root.thinkPadFanSummaryText()
+            }
+
+            Button {
+              width: parent.width
+              text: "Enable manual control"
+              visible: metrics.thinkPadCapability.controlAvailable && !metrics.thinkPadCapability.manualControlEnabled
+              enabled: !metrics.thinkPadFanActionRunning
+              tooltipText: root.thinkPadFanTooltip("enable")
+              foreground: root.foreground
+              accent: root.accent
+              fontFamily: root.fontFamily
+              fontSize: Style.font.bodySmall
+              onClicked: metrics.runThinkPadFan("enable")
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.space(6)
+
+              Button {
+                width: (parent.width - parent.spacing * 2) / 3
+                text: "Auto"
+                selected: metrics.thinkPadFan.level === "auto"
+                enabled: metrics.thinkPadCapability.controlAvailable && metrics.thinkPadCapability.manualControlEnabled && !metrics.thinkPadFanActionRunning
+                tooltipText: root.thinkPadFanTooltip("auto")
+                foreground: root.foreground
+                accent: root.accent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.caption
+                onClicked: metrics.runThinkPadFan("auto")
+              }
+
+              Button {
+                width: (parent.width - parent.spacing * 2) / 3
+                text: "Level 7"
+                selected: metrics.thinkPadFan.level === "7"
+                enabled: metrics.thinkPadCapability.controlAvailable && metrics.thinkPadCapability.manualControlEnabled && !metrics.thinkPadFanActionRunning
+                tooltipText: root.thinkPadFanTooltip("max")
+                foreground: root.foreground
+                accent: root.accent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.caption
+                onClicked: metrics.runThinkPadFan("max")
+              }
+
+              Button {
+                width: (parent.width - parent.spacing * 2) / 3
+                text: "Fan Overdrive"
+                selected: metrics.thinkPadFan.level === "full-speed"
+                enabled: metrics.thinkPadCapability.controlAvailable && metrics.thinkPadCapability.manualControlEnabled && !metrics.thinkPadFanActionRunning
+                tooltipText: root.thinkPadFanTooltip("full-speed")
+                foreground: root.foreground
+                accent: root.accent
+                fontFamily: root.fontFamily
+                fontSize: Style.font.caption
+                onClicked: metrics.runThinkPadFan("full-speed")
+              }
+            }
+
+            Text {
+              visible: metrics.thinkPadFanError !== ""
+              width: parent.width
+              text: metrics.thinkPadFanError
+              textFormat: Text.PlainText
+              color: root.urgent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
             }
           }
 
