@@ -24,7 +24,6 @@ test("cpu parser derives overall and per-core usage from consecutive samples", (
   assert.equal(parsed.cores.length, 2)
   assert.equal(parsed.cores[0].name, "CPU0")
 })
-
 test("memory parser converts kilobyte meminfo fields into byte totals", () => {
   const raw = [
     "MemTotal:       16384000 kB",
@@ -320,6 +319,10 @@ test("ThinkPad fan parser treats absent or malformed proc data as unavailable re
 })
 
 test("ThinkPad capability requires T530 identity and proc fan interface", () => {
+  assert.equal(Model.isThinkPadT530("ThinkPad T530"), true)
+  assert.equal(Model.isThinkPadT530("  LENOVO ThinkPad   T530  "), true)
+  assert.equal(Model.isThinkPadT530("ThinkPad X1 Carbon"), false)
+  assert.equal(Model.isThinkPadT530(""), false)
   assert.equal(Model.thinkPadFanCapability(false, "ThinkPad T530", "Y", true).telemetryAvailable, false)
   assert.equal(Model.thinkPadFanCapability(true, "ThinkPad X1 Carbon", "Y", true).hardwareSupported, false)
   assert.equal(Model.thinkPadFanCapability(true, "", "Y", true).hardwareSupported, false)
@@ -356,4 +359,19 @@ test("ThinkPad command builder accepts only fixed pkexec operations", () => {
   for (const operation of ["full-speed; id", "level 7", "", null]) {
     assert.equal(Model.thinkPadFanCommand(operation), null)
   }
+})
+
+test("ThinkPad helper failures stay concise and fall back to the exit code", () => {
+  assert.equal(Model.thinkPadFanFailure("The fan driver is busy\nadditional details", 1), "The fan driver is busy")
+  assert.equal(Model.thinkPadFanFailure("", 126), "Fan control failed (exit 126).")
+  assert.equal(Model.thinkPadFanFailure("x".repeat(250), 1).length, 180)
+})
+
+test("ThinkPad adapter uses read-only telemetry and the fixed command builder", () => {
+  const qml = fs.readFileSync(path.join(root, "Metrics.qml"), "utf8")
+  assert.match(qml, /\/proc\/acpi\/ibm\/fan/)
+  assert.match(qml, /\/sys\/class\/dmi\/id\/product_version/)
+  assert.match(qml, /command: \["test", "-x", "\/usr\/lib\/omarchy-system-specs\/fan-control"\]/)
+  assert.match(qml, /Model\.thinkPadFanCommand\(operation\)/)
+  assert.doesNotMatch(qml, /fanFile\.write|thinkPadFanFile\.write|Process[\s\S]{0,200}sh.*-c/)
 })

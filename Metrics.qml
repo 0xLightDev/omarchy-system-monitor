@@ -135,6 +135,29 @@ Item {
   property var fanValues: []
   property var fanTargets: []
 
+  // ThinkPad T530 fan telemetry is read-only. Hardware identity and the
+  // interface gate the UI; control remains behind the existing pkexec helper.
+  property string thinkPadProductVersion: ""
+  property string thinkPadControlParameter: ""
+  property bool thinkPadProcAvailable: false
+  property bool thinkPadHelperAvailable: false
+  property var thinkPadFan: Model.parseThinkPadFan("")
+  property string thinkPadFanError: ""
+  property string thinkPadFanStderr: ""
+  readonly property var thinkPadCapability: Model.thinkPadFanCapability(
+    thinkPadProcAvailable, thinkPadProductVersion, thinkPadControlParameter, thinkPadHelperAvailable)
+  readonly property bool thinkPadFanActionRunning: thinkPadFanProc.running
+
+  function runThinkPadFan(operation) {
+    var command = Model.thinkPadFanCommand(operation)
+    if (!command || !thinkPadCapability.controlAvailable || thinkPadFanProc.running) return
+    if (operation !== "enable" && !thinkPadCapability.manualControlEnabled) return
+    thinkPadFanError = ""
+    thinkPadFanStderr = ""
+    thinkPadFanProc.command = command
+    thinkPadFanProc.running = true
+  }
+
   readonly property bool fanCtlAvailable: fanMode !== ""
   readonly property bool fansManual: fanMode !== "" && fanMode !== "auto"
 
@@ -271,6 +294,7 @@ Item {
     routeFile.reload()
     networkFile.reload()
     diskFile.reload()
+    if (Model.isThinkPadT530(thinkPadProductVersion)) thinkPadFanFile.reload()
     if (cpuTempPath !== "") temperatureFile.reload()
     if (gpuBusyPath !== "") gpuBusyFile.reload()
     if (gpuTempPath !== "") gpuTemperatureFile.reload()
@@ -613,6 +637,77 @@ Item {
     printErrors: false
     onLoaded: root.hostname = String(text()).trim()
     onFileChanged: reload()
+  }
+
+  FileView {
+    id: thinkPadProductVersionFile
+    path: "/sys/class/dmi/id/product_version"
+    watchChanges: false
+    printErrors: false
+    onLoaded: {
+      root.thinkPadProductVersion = String(text()).trim()
+      if (Model.isThinkPadT530(root.thinkPadProductVersion)) {
+        thinkPadFanFile.reload()
+        thinkPadControlParamFile.reload()
+        thinkPadHelperCheckProc.running = true
+      }
+    }
+  }
+
+  FileView {
+    id: thinkPadFanFile
+    path: Model.isThinkPadT530(root.thinkPadProductVersion) ? "/proc/acpi/ibm/fan" : ""
+    watchChanges: false
+    printErrors: false
+    onLoaded: {
+      root.thinkPadProcAvailable = true
+      root.thinkPadFan = Model.parseThinkPadFan(text())
+    }
+    onLoadFailed: {
+      root.thinkPadProcAvailable = false
+      root.thinkPadFan = Model.parseThinkPadFan("")
+    }
+  }
+
+  FileView {
+    id: thinkPadControlParamFile
+    path: Model.isThinkPadT530(root.thinkPadProductVersion)
+      ? "/sys/module/thinkpad_acpi/parameters/fan_control" : ""
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.thinkPadControlParameter = String(text()).trim()
+    onLoadFailed: root.thinkPadControlParameter = ""
+    onFileChanged: reload()
+  }
+
+  Process {
+    id: thinkPadHelperCheckProc
+    command: ["test", "-x", "/usr/lib/omarchy-system-specs/fan-control"]
+    onExited: function(exitCode, exitStatus) {
+      root.thinkPadHelperAvailable = exitCode === 0
+    }
+  }
+
+  Process {
+    id: thinkPadFanProc
+    command: []
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var lines = String(text).trim().split("\n")
+        root.thinkPadFanStderr = lines[0].slice(0, 180)
+      }
+    }
+    onExited: function(exitCode, exitStatus) {
+      if (exitCode === 0) {
+        root.thinkPadFanError = ""
+      } else {
+        root.thinkPadFanError = Model.thinkPadFanFailure(root.thinkPadFanStderr, exitCode)
+      }
+      thinkPadControlParamFile.reload()
+      thinkPadFanFile.reload()
+    }
   }
 
   // The daemon rewrites its config on every mode change, so watching this

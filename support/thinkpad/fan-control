@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ $# -eq 1 ]] || { echo "Usage: fan-control {enable|max|auto|full-speed}" >&2; exit 2; }
+case "$1" in
+  enable|max|auto|full-speed) ;;
+  *) echo "Usage: fan-control {enable|max|auto|full-speed}" >&2; exit 2 ;;
+esac
+
+parameter=/sys/module/thinkpad_acpi/parameters/fan_control
+if [[ ! -r "$parameter" ]] || [[ ! "$(<"$parameter")" =~ ^(Y|1)$ ]]; then
+  if [[ -d /sys/module/thinkpad_acpi ]]; then
+    modprobe -r thinkpad_acpi || {
+      echo "The kernel driver is busy; restart the computer to enable fan control." >&2
+      exit 1
+    }
+  fi
+  modprobe thinkpad_acpi fan_control=1 || {
+    modprobe thinkpad_acpi || true
+    echo "Could not load the ThinkPad fan driver." >&2
+    exit 1
+  }
+fi
+[[ -r "$parameter" && "$(<"$parameter")" =~ ^(Y|1)$ ]] || {
+  echo "The kernel did not enable ThinkPad fan control." >&2
+  exit 1
+}
+fan=/proc/acpi/ibm/fan
+[[ -w "$fan" ]] || { echo "ThinkPad fan control is unavailable on this hardware." >&2; exit 1; }
+case "$1" in
+  enable) ;;
+  max) printf 'level 7\n' > "$fan" ;;
+  auto) printf 'level auto\n' > "$fan" ;;
+  full-speed) printf 'level full-speed\n' > "$fan" ;;
+esac

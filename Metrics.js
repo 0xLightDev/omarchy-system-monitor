@@ -250,11 +250,14 @@ function parseThinkPadFan(raw) {
   return result
 }
 
-function thinkPadFanCapability(procAvailable, productVersion, fanControlValue, helperAvailable) {
+function isThinkPadT530(productVersion) {
   var identity = String(productVersion === undefined || productVersion === null ? "" : productVersion)
     .trim().toLowerCase().replace(/\s+/g, " ")
-  var isT530 = /(^|[^a-z0-9])thinkpad t530([^a-z0-9]|$)/.test(identity)
-  var hardwareSupported = Boolean(procAvailable) && isT530
+  return /(^|[^a-z0-9])thinkpad t530([^a-z0-9]|$)/.test(identity)
+}
+
+function thinkPadFanCapability(procAvailable, productVersion, fanControlValue, helperAvailable) {
+  var hardwareSupported = Boolean(procAvailable) && isThinkPadT530(productVersion)
   var controlAvailable = hardwareSupported && Boolean(helperAvailable)
   var controlValue = String(fanControlValue === undefined || fanControlValue === null ? "" : fanControlValue).trim()
   var manualControlEnabled = hardwareSupported && /^(y|1)$/i.test(controlValue)
@@ -275,6 +278,13 @@ function thinkPadFanCapability(procAvailable, productVersion, fanControlValue, h
 function thinkPadFanCommand(operation) {
   if (operation !== "enable" && operation !== "max" && operation !== "auto" && operation !== "full-speed") return null
   return ["pkexec", "/usr/lib/omarchy-system-specs/fan-control", operation]
+}
+
+function thinkPadFanFailure(stderr, exitCode) {
+  var lines = String(stderr === undefined || stderr === null ? "" : stderr).trim().split("\n")
+  var message = lines.length > 0 ? lines[0].trim() : ""
+  if (message === "") message = "Fan control failed (exit " + exitCode + ")."
+  return message.slice(0, 180)
 }
 
 // On-disk filesystem types worth a capacity row. An allowlist keeps the ever-
@@ -366,9 +376,11 @@ if (typeof module !== "undefined" && module.exports) {
     parseGpuPercent: parseGpuPercent,
     parseByteCount: parseByteCount,
     parseSensorValue: parseSensorValue,
+    isThinkPadT530: isThinkPadT530,
     parseThinkPadFan: parseThinkPadFan,
     thinkPadFanCapability: thinkPadFanCapability,
     thinkPadFanCommand: thinkPadFanCommand,
+    thinkPadFanFailure: thinkPadFanFailure,
     parseFilesystems: parseFilesystems,
     peakValue: peakValue,
     maximumPercent: maximumPercent,
