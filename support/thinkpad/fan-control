@@ -10,13 +10,13 @@ esac
 parameter=/sys/module/thinkpad_acpi/parameters/fan_control
 if [[ ! -r "$parameter" ]] || [[ ! "$(<"$parameter")" =~ ^(Y|1)$ ]]; then
   if [[ -d /sys/module/thinkpad_acpi ]]; then
-    modprobe -r thinkpad_acpi || {
+    /usr/bin/modprobe -r thinkpad_acpi || {
       echo "The kernel driver is busy; restart the computer to enable fan control." >&2
       exit 1
     }
   fi
-  modprobe thinkpad_acpi fan_control=1 || {
-    modprobe thinkpad_acpi || true
+  /usr/bin/modprobe thinkpad_acpi fan_control=1 || {
+    /usr/bin/modprobe thinkpad_acpi || true
     echo "Could not load the ThinkPad fan driver." >&2
     exit 1
   }

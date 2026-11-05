@@ -144,12 +144,12 @@ hover. If manual control is disabled in the kernel, the panel offers an Enable
 manual control action. The regular plugin installer never changes system
 files.
 
-The maintained copies of the existing helper, PolicyKit action, and
-`thinkpad_acpi` module option are under `support/thinkpad/`. On
-`omarchy-laptop`, those files were compared with the installed copies on
-2026-11-05 and matched. A fresh T530 setup or a future helper change needs a
-separate review and deliberate privileged installation; other machines should
-not receive these files.
+The maintained helper, PolicyKit action, and `thinkpad_acpi` module option are
+under `support/thinkpad/`. The original laptop files were compared with the
+installed copies on 2026-11-05. The maintained helper now uses the absolute
+`/usr/bin/modprobe` path; the installed legacy helper remains unchanged until
+Light accepts T530 behavior and separately approves its update. These files
+must never be installed on other hardware.
 
 ## Fan control (Apple Silicon, optional)
 

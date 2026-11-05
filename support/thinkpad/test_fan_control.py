@@ -20,6 +20,7 @@ class FanControlTest(unittest.TestCase):
                                 'echo Y > "$TEST_ROOT/parameter"\n')
             modprobe.chmod(0o755)
             script = Path(__file__).with_name('fan-control').read_text()
+            script = script.replace('/usr/bin/modprobe', str(modprobe))
             script = script.replace('/sys/module/thinkpad_acpi/parameters/fan_control', str(parameter))
             script = script.replace('/sys/module/thinkpad_acpi', directory)
             script = script.replace('/proc/acpi/ibm/fan', str(fan))
