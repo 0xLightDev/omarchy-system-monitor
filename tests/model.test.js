@@ -24,7 +24,6 @@ test("cpu parser derives overall and per-core usage from consecutive samples", (
   assert.equal(parsed.cores.length, 2)
   assert.equal(parsed.cores[0].name, "CPU0")
 })
-
 test("memory parser converts kilobyte meminfo fields into byte totals", () => {
   const raw = [
     "MemTotal:       16384000 kB",
@@ -287,4 +286,100 @@ test("repository ships marketplace and README preview images", () => {
     assert.deepEqual([...contents.subarray(0, 8)], pngSignature)
     assert.ok(contents.length > 10_000, `${file} should contain a real preview`)
   }
+})
+
+test("ThinkPad fan parser reads status, RPM and firmware Auto mode", () => {
+  assert.deepEqual(Model.parseThinkPadFan("status: enabled\nspeed: 1963\nlevel: auto\n"), {
+    available: true,
+    status: "enabled",
+    speed: 1963,
+    level: "auto"
+  })
+})
+
+test("ThinkPad fan parser preserves supported level 7 and full-speed modes", () => {
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 2800\nlevel: 7\n").level, "7")
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 4700\nlevel: full-speed\n").level, "full-speed")
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 4700\nlevel: disengaged\n").level, "full-speed")
+})
+
+test("ThinkPad fan parser treats absent or malformed proc data as unavailable readings", () => {
+  assert.deepEqual(Model.parseThinkPadFan(""), {
+    available: false,
+    status: "unknown",
+    speed: -1,
+    level: "unknown"
+  })
+  assert.deepEqual(Model.parseThinkPadFan("status: maybe\nspeed: nope\nlevel: turbo\n"), {
+    available: true,
+    status: "unknown",
+    speed: -1,
+    level: "unknown"
+  })
+})
+
+test("ThinkPad capability requires T530 identity and proc fan interface", () => {
+  assert.equal(Model.isThinkPadT530("ThinkPad T530"), true)
+  assert.equal(Model.isThinkPadT530("  LENOVO ThinkPad   T530  "), true)
+  assert.equal(Model.isThinkPadT530("ThinkPad X1 Carbon"), false)
+  assert.equal(Model.isThinkPadT530(""), false)
+  assert.equal(Model.thinkPadFanCapability(false, "ThinkPad T530", "Y", true).telemetryAvailable, false)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad X1 Carbon", "Y", true).hardwareSupported, false)
+  assert.equal(Model.thinkPadFanCapability(true, "", "Y", true).hardwareSupported, false)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "Y", true).hardwareSupported, true)
+})
+
+test("ThinkPad controls distinguish missing helper from disabled manual mode", () => {
+  assert.deepEqual(Model.thinkPadFanCapability(true, "ThinkPad T530", "N", false), {
+    hardwareSupported: true,
+    telemetryAvailable: true,
+    controlAvailable: false,
+    manualControlEnabled: false,
+    reason: "Fan control helper is unavailable"
+  })
+  assert.deepEqual(Model.thinkPadFanCapability(true, "ThinkPad T530", "N", true), {
+    hardwareSupported: true,
+    telemetryAvailable: true,
+    controlAvailable: true,
+    manualControlEnabled: false,
+    reason: "Enable manual fan control to use these modes"
+  })
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "Y", true).manualControlEnabled, true)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "1", true).manualControlEnabled, true)
+})
+
+test("ThinkPad command builder accepts only fixed pkexec operations", () => {
+  for (const operation of ["enable", "max", "auto", "full-speed"]) {
+    assert.deepEqual(Model.thinkPadFanCommand(operation), [
+      "pkexec",
+      "/usr/lib/omarchy-system-specs/fan-control",
+      operation
+    ])
+  }
+  for (const operation of ["full-speed; id", "level 7", "", null]) {
+    assert.equal(Model.thinkPadFanCommand(operation), null)
+  }
+})
+
+test("ThinkPad helper failures stay concise and fall back to the exit code", () => {
+  assert.equal(Model.thinkPadFanFailure("The fan driver is busy\nadditional details", 1), "The fan driver is busy")
+  assert.equal(Model.thinkPadFanFailure("", 126), "Fan control failed (exit 126).")
+  assert.equal(Model.thinkPadFanFailure("x".repeat(250), 1).length, 180)
+})
+
+test("ThinkPad adapter uses read-only telemetry and the fixed command builder", () => {
+  const qml = fs.readFileSync(path.join(root, "Metrics.qml"), "utf8")
+  assert.match(qml, /\/proc\/acpi\/ibm\/fan/)
+  assert.match(qml, /\/sys\/class\/dmi\/id\/product_version/)
+  assert.match(qml, /command: \["test", "-x", "\/usr\/lib\/omarchy-system-specs\/fan-control"\]/)
+  assert.match(qml, /Model\.thinkPadFanCommand\(operation\)/)
+  assert.doesNotMatch(qml, /fanFile\.write|thinkPadFanFile\.write|Process[\s\S]{0,200}sh.*-c/)
+})
+
+test("ThinkPad panel gates T530 controls and explains Fan Overdrive risk", () => {
+  const qml = fs.readFileSync(path.join(root, "Panel.qml"), "utf8")
+  assert.match(qml, /metrics\.thinkPadCapability\.telemetryAvailable/)
+  assert.match(qml, /Fan Overdrive/)
+  assert.match(qml, /may exceed hardware limits/)
+  assert.match(qml, /does not change CPU\/GPU clocks or firmware/)
 })

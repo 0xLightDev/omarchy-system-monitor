@@ -225,6 +225,68 @@ function parseSensorValue(raw, kind) {
   return kind === "power" ? value / 1000000 : value / 1000
 }
 
+function parseThinkPadFan(raw) {
+  var text = String(raw === undefined || raw === null ? "" : raw).trim()
+  var result = { available: text !== "", status: "unknown", speed: -1, level: "unknown" }
+  if (text === "") return result
+
+  var lines = text.split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var match = lines[i].match(/^\s*([a-z]+):\s*(.*?)\s*$/i)
+    if (!match) continue
+    var key = match[1].toLowerCase()
+    var value = match[2].trim().toLowerCase()
+    if (key === "status" && (value === "enabled" || value === "disabled")) {
+      result.status = value
+    } else if (key === "speed" && /^[0-9]+$/.test(value)) {
+      var speed = Number(value)
+      if (isFinite(speed)) result.speed = speed
+    } else if (key === "level") {
+      if (value === "auto") result.level = "auto"
+      else if (value === "full-speed" || value === "disengaged") result.level = "full-speed"
+      else if (/^[0-7]$/.test(value)) result.level = value
+    }
+  }
+  return result
+}
+
+function isThinkPadT530(productVersion) {
+  var identity = String(productVersion === undefined || productVersion === null ? "" : productVersion)
+    .trim().toLowerCase().replace(/\s+/g, " ")
+  return /(^|[^a-z0-9])thinkpad t530([^a-z0-9]|$)/.test(identity)
+}
+
+function thinkPadFanCapability(procAvailable, productVersion, fanControlValue, helperAvailable) {
+  var hardwareSupported = Boolean(procAvailable) && isThinkPadT530(productVersion)
+  var controlAvailable = hardwareSupported && Boolean(helperAvailable)
+  var controlValue = String(fanControlValue === undefined || fanControlValue === null ? "" : fanControlValue).trim()
+  var manualControlEnabled = hardwareSupported && /^(y|1)$/i.test(controlValue)
+  var reason = ""
+
+  if (hardwareSupported && !helperAvailable) reason = "Fan control helper is unavailable"
+  else if (controlAvailable && !manualControlEnabled) reason = "Enable manual fan control to use these modes"
+
+  return {
+    hardwareSupported: hardwareSupported,
+    telemetryAvailable: hardwareSupported,
+    controlAvailable: controlAvailable,
+    manualControlEnabled: manualControlEnabled,
+    reason: reason
+  }
+}
+
+function thinkPadFanCommand(operation) {
+  if (operation !== "enable" && operation !== "max" && operation !== "auto" && operation !== "full-speed") return null
+  return ["pkexec", "/usr/lib/omarchy-system-specs/fan-control", operation]
+}
+
+function thinkPadFanFailure(stderr, exitCode) {
+  var lines = String(stderr === undefined || stderr === null ? "" : stderr).trim().split("\n")
+  var message = lines.length > 0 ? lines[0].trim() : ""
+  if (message === "") message = "Fan control failed (exit " + exitCode + ")."
+  return message.slice(0, 180)
+}
+
 // On-disk filesystem types worth a capacity row. An allowlist keeps the ever-
 // growing set of pseudo filesystems (tmpfs, overlay, squashfs, cgroup, and so
 // on) out without having to name each one; `df -l` already drops network
@@ -314,6 +376,11 @@ if (typeof module !== "undefined" && module.exports) {
     parseGpuPercent: parseGpuPercent,
     parseByteCount: parseByteCount,
     parseSensorValue: parseSensorValue,
+    isThinkPadT530: isThinkPadT530,
+    parseThinkPadFan: parseThinkPadFan,
+    thinkPadFanCapability: thinkPadFanCapability,
+    thinkPadFanCommand: thinkPadFanCommand,
+    thinkPadFanFailure: thinkPadFanFailure,
     parseFilesystems: parseFilesystems,
     peakValue: peakValue,
     maximumPercent: maximumPercent,
