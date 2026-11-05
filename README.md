@@ -152,7 +152,8 @@ under `support/thinkpad/`. The original laptop files were compared with the
 installed copies on 2026-11-05. The maintained helper now uses the absolute
 `/usr/bin/modprobe` path; the installed legacy helper remains unchanged until
 Light accepts T530 behavior and separately approves its update. The installed
-helper must be updated before relying on the maintained helper's DMI check.
+legacy helper does not perform the DMI check, so it must be updated before
+relying on the maintained helper's hardware gate.
 These files must never be installed on other hardware.
 
 ## Fan control (Apple Silicon, optional)
