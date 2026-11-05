@@ -288,3 +288,72 @@ test("repository ships marketplace and README preview images", () => {
     assert.ok(contents.length > 10_000, `${file} should contain a real preview`)
   }
 })
+
+test("ThinkPad fan parser reads status, RPM and firmware Auto mode", () => {
+  assert.deepEqual(Model.parseThinkPadFan("status: enabled\nspeed: 1963\nlevel: auto\n"), {
+    available: true,
+    status: "enabled",
+    speed: 1963,
+    level: "auto"
+  })
+})
+
+test("ThinkPad fan parser preserves supported level 7 and full-speed modes", () => {
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 2800\nlevel: 7\n").level, "7")
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 4700\nlevel: full-speed\n").level, "full-speed")
+  assert.equal(Model.parseThinkPadFan("status: enabled\nspeed: 4700\nlevel: disengaged\n").level, "full-speed")
+})
+
+test("ThinkPad fan parser treats absent or malformed proc data as unavailable readings", () => {
+  assert.deepEqual(Model.parseThinkPadFan(""), {
+    available: false,
+    status: "unknown",
+    speed: -1,
+    level: "unknown"
+  })
+  assert.deepEqual(Model.parseThinkPadFan("status: maybe\nspeed: nope\nlevel: turbo\n"), {
+    available: true,
+    status: "unknown",
+    speed: -1,
+    level: "unknown"
+  })
+})
+
+test("ThinkPad capability requires T530 identity and proc fan interface", () => {
+  assert.equal(Model.thinkPadFanCapability(false, "ThinkPad T530", "Y", true).telemetryAvailable, false)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad X1 Carbon", "Y", true).hardwareSupported, false)
+  assert.equal(Model.thinkPadFanCapability(true, "", "Y", true).hardwareSupported, false)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "Y", true).hardwareSupported, true)
+})
+
+test("ThinkPad controls distinguish missing helper from disabled manual mode", () => {
+  assert.deepEqual(Model.thinkPadFanCapability(true, "ThinkPad T530", "N", false), {
+    hardwareSupported: true,
+    telemetryAvailable: true,
+    controlAvailable: false,
+    manualControlEnabled: false,
+    reason: "Fan control helper is unavailable"
+  })
+  assert.deepEqual(Model.thinkPadFanCapability(true, "ThinkPad T530", "N", true), {
+    hardwareSupported: true,
+    telemetryAvailable: true,
+    controlAvailable: true,
+    manualControlEnabled: false,
+    reason: "Enable manual fan control to use these modes"
+  })
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "Y", true).manualControlEnabled, true)
+  assert.equal(Model.thinkPadFanCapability(true, "ThinkPad T530", "1", true).manualControlEnabled, true)
+})
+
+test("ThinkPad command builder accepts only fixed pkexec operations", () => {
+  for (const operation of ["enable", "max", "auto", "full-speed"]) {
+    assert.deepEqual(Model.thinkPadFanCommand(operation), [
+      "pkexec",
+      "/usr/lib/omarchy-system-specs/fan-control",
+      operation
+    ])
+  }
+  for (const operation of ["full-speed; id", "level 7", "", null]) {
+    assert.equal(Model.thinkPadFanCommand(operation), null)
+  }
+})
