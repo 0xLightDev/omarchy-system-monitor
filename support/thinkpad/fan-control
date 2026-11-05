@@ -7,6 +7,12 @@ case "$1" in
   *) echo "Usage: fan-control {enable|max|auto|full-speed}" >&2; exit 2 ;;
 esac
 
+dmi=/sys/class/dmi/id/product_version
+if [[ ! -r "$dmi" ]] || ! [[ "$(<"$dmi")" =~ (^|[[:space:]])T530([[:space:]]|$) ]]; then
+  echo "Fan control is only supported on ThinkPad T530 hardware." >&2
+  exit 1
+fi
+
 parameter=/sys/module/thinkpad_acpi/parameters/fan_control
 if [[ ! -r "$parameter" ]] || [[ ! "$(<"$parameter")" =~ ^(Y|1)$ ]]; then
   if [[ -d /sys/module/thinkpad_acpi ]]; then

@@ -7,11 +7,13 @@ import unittest
 
 class FanControlTest(unittest.TestCase):
     def run_helper(self, mode, enabled='N', busy=False, fan_present=True,
-                   fail_configured_load=False):
+                   fail_configured_load=False, model_version='ThinkPad T530'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             parameter = root / 'parameter'
             parameter.write_text(enabled)
+            dmi = root / 'product_version'
+            dmi.write_text(model_version)
             fan = root / 'fan'
             if fan_present:
                 fan.touch()
@@ -24,6 +26,7 @@ class FanControlTest(unittest.TestCase):
             modprobe.chmod(0o755)
             script = Path(__file__).with_name('fan-control').read_text()
             script = script.replace('/usr/bin/modprobe', str(modprobe))
+            script = script.replace('/sys/class/dmi/id/product_version', str(dmi))
             script = script.replace('/sys/module/thinkpad_acpi/parameters/fan_control', str(parameter))
             script = script.replace('/sys/module/thinkpad_acpi', directory)
             script = script.replace('/proc/acpi/ibm/fan', str(fan))
@@ -50,6 +53,12 @@ class FanControlTest(unittest.TestCase):
     def test_invalid_mode_has_no_side_effects(self):
         result, fan, calls = self.run_helper('invalid')
         self.assertEqual((result.returncode, fan, calls), (2, '', ''))
+
+    def test_non_t530_hardware_is_rejected_before_driver_changes(self):
+        result, fan, calls = self.run_helper('max', model_version='ThinkPad X1 Carbon')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('only supported on ThinkPad T530', result.stderr)
+        self.assertEqual((fan, calls), ('', ''))
 
     def test_busy_driver_is_reported_without_writing_fan(self):
         result, fan, calls = self.run_helper('max', busy=True)
