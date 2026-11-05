@@ -8,7 +8,12 @@ case "$1" in
 esac
 
 dmi=/sys/class/dmi/id/product_version
-if [[ ! -r "$dmi" ]] || ! [[ "$(<"$dmi")" =~ (^|[[:space:]])T530([[:space:]]|$) ]]; then
+if [[ ! -r "$dmi" ]]; then
+  echo "Fan control is only supported on ThinkPad T530 hardware." >&2
+  exit 1
+fi
+product_version="$(<"$dmi")"
+if [[ ! "${product_version,,}" =~ (^|[^a-z0-9])thinkpad[[:space:]]+t530([^a-z0-9]|$) ]]; then
   echo "Fan control is only supported on ThinkPad T530 hardware." >&2
   exit 1
 fi

@@ -55,10 +55,12 @@ class FanControlTest(unittest.TestCase):
         self.assertEqual((result.returncode, fan, calls), (2, '', ''))
 
     def test_non_t530_hardware_is_rejected_before_driver_changes(self):
-        result, fan, calls = self.run_helper('max', model_version='ThinkPad X1 Carbon')
-        self.assertEqual(result.returncode, 1)
-        self.assertIn('only supported on ThinkPad T530', result.stderr)
-        self.assertEqual((fan, calls), ('', ''))
+        for model_version in ('T530', 'ThinkPad T530i', 'ThinkPad X1 Carbon'):
+            with self.subTest(model_version=model_version):
+                result, fan, calls = self.run_helper('max', model_version=model_version)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn('only supported on ThinkPad T530', result.stderr)
+                self.assertEqual((fan, calls), ('', ''))
 
     def test_busy_driver_is_reported_without_writing_fan(self):
         result, fan, calls = self.run_helper('max', busy=True)
